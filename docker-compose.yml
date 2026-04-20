@@ -1,0 +1,14 @@
+services:
+  auth:
+    build: .
+    ports:
+      - "50051:50051"
+    env_file:
+      - .env
+    networks:
+      - velotrax-net
+
+networks:
+  velotrax-net:
+    external: true
+    name: velotrax-net
