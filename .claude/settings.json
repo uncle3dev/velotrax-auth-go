@@ -1,6 +1,0 @@
-{
-  "env": {
-        "ANTHROPIC_BASE_URL": "https://llm.wokushop.com",
-        "ANTHROPIC_AUTH_TOKEN": "sk-QIjpYDhNg8dWRYyp1kj66qJnqPNmPyGLWI8tCwIeVabZqPyx"
-        }
-}
