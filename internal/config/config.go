@@ -8,8 +8,9 @@ import (
 )
 
 type Config struct {
-	AppPort int    `mapstructure:"APP_PORT"`
-	AppEnv  string `mapstructure:"APP_ENV"`
+	GRPCPort int    `mapstructure:"GRPC_PORT"`
+	HTTPPort int    `mapstructure:"HTTP_PORT"`
+	AppEnv   string `mapstructure:"APP_ENV"`
 
 	JWTSecret        string        `mapstructure:"JWT_SECRET"`
 	JWTExpiry        time.Duration `mapstructure:"JWT_EXPIRY"`
@@ -22,7 +23,8 @@ type Config struct {
 
 func Load() (*Config, error) {
 	v := viper.New()
-	v.SetDefault("APP_PORT", 50051)
+	v.SetDefault("GRPC_PORT", 50051)
+	v.SetDefault("HTTP_PORT", 8081)
 	v.SetDefault("APP_ENV", "development")
 	v.SetDefault("JWT_EXPIRY", 15*time.Minute)
 	v.SetDefault("JWT_REFRESH_EXPIRY", 7*24*time.Hour)
@@ -30,7 +32,7 @@ func Load() (*Config, error) {
 	v.SetDefault("JWT_SECRET", "change_me_to_a_strong_secret_at_least_32_chars")
 
 	v.AutomaticEnv()
-	for _, key := range []string{"APP_PORT", "APP_ENV", "JWT_SECRET", "JWT_EXPIRY", "JWT_REFRESH_EXPIRY", "LOG_LEVEL", "MONGO_URI"} {
+	for _, key := range []string{"GRPC_PORT", "HTTP_PORT", "APP_ENV", "JWT_SECRET", "JWT_EXPIRY", "JWT_REFRESH_EXPIRY", "LOG_LEVEL", "MONGO_URI"} {
 		v.BindEnv(key)
 	}
 

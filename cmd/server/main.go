@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,10 +14,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"google.golang.org/grpc"
 
 	"github.com/uncle3dev/velotrax-auth-go/internal/config"
+	"github.com/uncle3dev/velotrax-auth-go/internal/interceptor"
 	"github.com/uncle3dev/velotrax-auth-go/internal/db"
+	authpb "github.com/uncle3dev/velotrax-auth-go/internal/gen/auth"
+	"github.com/uncle3dev/velotrax-auth-go/internal/middleware"
 	"github.com/uncle3dev/velotrax-auth-go/internal/router"
+	"github.com/uncle3dev/velotrax-auth-go/internal/service"
 )
 
 func main() {
@@ -31,11 +37,6 @@ func main() {
 	}
 	defer logger.Sync()
 
-	logger.Info("Starting velotrax-auth-go",
-		zap.String("env", cfg.AppEnv),
-		zap.Int("port", cfg.AppPort),
-	)
-
 	mongoDB, err := db.Connect(context.Background(), cfg.MongoURI)
 	if err != nil {
 		logger.Fatal("Failed to connect to MongoDB", zap.Error(err))
@@ -45,7 +46,6 @@ func main() {
 		defer cancel()
 		mongoDB.Disconnect(shutdownCtx)
 	}()
-	logger.Info("Connected to MongoDB")
 
 	if err := db.EnsureIndexes(context.Background(), mongoDB.Database); err != nil {
 		logger.Fatal("Failed to ensure indexes", zap.Error(err))
@@ -55,21 +55,36 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	engine := gin.New()
-	router.Setup(engine, mongoDB, logger, cfg)
+	// gRPC server
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(interceptor.UnaryLogger(logger)))
+	authpb.RegisterAuthServiceServer(grpcSrv, service.NewAuthService(mongoDB.Database, cfg, logger))
 
-	srv := &http.Server{
-		Addr:           fmt.Sprintf(":%d", cfg.AppPort),
-		Handler:        engine,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
+	if err != nil {
+		logger.Fatal("Failed to listen for gRPC", zap.Error(err))
 	}
 
 	go func() {
-		logger.Info("Server listening", zap.String("addr", srv.Addr))
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Fatal("Server error", zap.Error(err))
+		logger.Info("gRPC server listening", zap.Int("port", cfg.GRPCPort))
+		if err := grpcSrv.Serve(lis); err != nil {
+			logger.Fatal("gRPC server error", zap.Error(err))
+		}
+	}()
+
+	// HTTP server (health check)
+	engine := gin.New()
+	engine.Use(middleware.Logger(logger), middleware.Recovery(logger), middleware.CORS())
+	router.Setup(engine, mongoDB, logger, cfg)
+
+	httpSrv := &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
+		Handler: engine,
+	}
+
+	go func() {
+		logger.Info("HTTP server listening", zap.Int("port", cfg.HTTPPort))
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Fatal("HTTP server error", zap.Error(err))
 		}
 	}()
 
@@ -77,9 +92,10 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
+	grpcSrv.GracefulStop()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	srv.Shutdown(ctx)
+	httpSrv.Shutdown(ctx)
 	logger.Info("Server stopped")
 }
 
