@@ -58,7 +58,7 @@ func (s *AuthService) Register(ctx context.Context, req *authpb.RegisterRequest)
 
 func (s *AuthService) Login(ctx context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
 	var user model.User
-	err := s.db.Collection(model.CollectionUsers).FindOne(ctx, bson.M{"userName": req.Email}).Decode(&user)
+	err := s.db.Collection(model.CollectionUsers).FindOne(ctx, bson.M{"email": req.Email}).Decode(&user)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
