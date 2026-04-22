@@ -36,7 +36,8 @@ func (s *AuthService) Register(ctx context.Context, req *authpb.RegisterRequest)
 
 	user := model.User{
 		ID:           bson.NewObjectID(),
-		UserName:     req.Email,
+		UserName:     req.FullName,
+		Email:        req.Email,
 		PasswordHash: string(hash),
 		Active:       true,
 		Roles:        []string{model.RoleFreeUser},
@@ -76,11 +77,20 @@ func (s *AuthService) Login(ctx context.Context, req *authpb.LoginRequest) (*aut
 		return nil, status.Error(codes.Internal, "failed to generate refresh token")
 	}
 
-	return &authpb.LoginResponse{
+	response := &authpb.LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		ExpiresIn:    int64(s.cfg.JWTExpiry.Seconds()),
-	}, nil
+		User:         &authpb.UserDetail{Id: user.ID.Hex(), Email: user.Email, Roles: user.Roles},
+	}
+	// Log the successful login response for debugging purposes (check for tokens)
+	// s.logger.Info("Successful user login",
+	// 	zap.String("user_id", user.ID.Hex()),
+	// 	zap.String("access_token", accessToken),
+	// 	zap.String("refresh_token", refreshToken),
+	// )
+
+	return response, nil
 }
 
 func (s *AuthService) Logout(ctx context.Context, req *authpb.LogoutRequest) (*authpb.LogoutResponse, error) {
