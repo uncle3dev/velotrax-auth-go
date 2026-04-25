@@ -67,12 +67,12 @@ func (s *AuthService) Login(ctx context.Context, req *authpb.LoginRequest) (*aut
 		return nil, status.Error(codes.Unauthenticated, "invalid credentials")
 	}
 
-	accessToken, err := token.GenerateAccess(user.ID.Hex(), s.cfg)
+	accessToken, err := token.GenerateAccess(user.ID.Hex(), user.Roles, s.cfg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to generate token")
 	}
 
-	refreshToken, err := token.GenerateRefresh(user.ID.Hex(), s.cfg)
+	refreshToken, err := token.GenerateRefresh(user.ID.Hex(), user.Roles, s.cfg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to generate refresh token")
 	}
@@ -98,12 +98,12 @@ func (s *AuthService) Logout(ctx context.Context, req *authpb.LogoutRequest) (*a
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, req *authpb.RefreshTokenRequest) (*authpb.RefreshTokenResponse, error) {
-	userID, err := token.ValidateRefresh(req.RefreshToken, s.cfg)
+	userID, roles, err := token.ValidateRefresh(req.RefreshToken, s.cfg)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "invalid refresh token")
 	}
 
-	accessToken, err := token.GenerateAccess(userID, s.cfg)
+	accessToken, err := token.GenerateAccess(userID, roles, s.cfg)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to generate token")
 	}

@@ -9,26 +9,29 @@ import (
 )
 
 type claims struct {
-	UserID string `json:"user_id"`
+	Type  string   `json:"type"`
+	Roles []string `json:"roles,omitempty"`
 	jwt.RegisteredClaims
 }
 
-func GenerateAccess(userID string, cfg *config.Config) (string, error) {
-	return generate(userID, cfg.JWTExpiry, cfg.JWTSecret)
+func GenerateAccess(userID string, roles []string, cfg *config.Config) (string, error) {
+	return generate(userID, roles, "access", cfg.JWTExpiry, cfg.JWTSecret)
 }
 
-func GenerateRefresh(userID string, cfg *config.Config) (string, error) {
-	return generate(userID, cfg.JWTRefreshExpiry, cfg.JWTSecret)
+func GenerateRefresh(userID string, roles []string, cfg *config.Config) (string, error) {
+	return generate(userID, roles, "refresh", cfg.JWTRefreshExpiry, cfg.JWTSecret)
 }
 
-func ValidateRefresh(tokenStr string, cfg *config.Config) (string, error) {
+func ValidateRefresh(tokenStr string, cfg *config.Config) (string, []string, error) {
 	return validate(tokenStr, cfg.JWTSecret)
 }
 
-func generate(userID string, expiry time.Duration, secret string) (string, error) {
+func generate(userID string, roles []string, tokenType string, expiry time.Duration, secret string) (string, error) {
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
-		UserID: userID,
+		Type:  tokenType,
+		Roles: roles,
 		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   userID,
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
@@ -36,7 +39,7 @@ func generate(userID string, expiry time.Duration, secret string) (string, error
 	return t.SignedString([]byte(secret))
 }
 
-func validate(tokenStr, secret string) (string, error) {
+func validate(tokenStr, secret string) (string, []string, error) {
 	t, err := jwt.ParseWithClaims(tokenStr, &claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
@@ -44,11 +47,17 @@ func validate(tokenStr, secret string) (string, error) {
 		return []byte(secret), nil
 	})
 	if err != nil || !t.Valid {
-		return "", fmt.Errorf("invalid token")
+		return "", nil, fmt.Errorf("invalid token")
 	}
 	c, ok := t.Claims.(*claims)
 	if !ok {
-		return "", fmt.Errorf("invalid claims")
+		return "", nil, fmt.Errorf("invalid claims")
 	}
-	return c.UserID, nil
+	if c.Type != "refresh" {
+		return "", nil, fmt.Errorf("invalid token type")
+	}
+	if c.Subject == "" {
+		return "", nil, fmt.Errorf("missing subject")
+	}
+	return c.Subject, c.Roles, nil
 }
