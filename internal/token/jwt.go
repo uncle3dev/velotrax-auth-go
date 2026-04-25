@@ -22,8 +22,12 @@ func GenerateRefresh(userID string, roles []string, cfg *config.Config) (string,
 	return generate(userID, roles, "refresh", cfg.JWTRefreshExpiry, cfg.JWTSecret)
 }
 
+func ValidateAccess(tokenStr string, cfg *config.Config) (string, []string, error) {
+	return validate(tokenStr, cfg.JWTSecret, "access")
+}
+
 func ValidateRefresh(tokenStr string, cfg *config.Config) (string, []string, error) {
-	return validate(tokenStr, cfg.JWTSecret)
+	return validate(tokenStr, cfg.JWTSecret, "refresh")
 }
 
 func generate(userID string, roles []string, tokenType string, expiry time.Duration, secret string) (string, error) {
@@ -39,7 +43,7 @@ func generate(userID string, roles []string, tokenType string, expiry time.Durat
 	return t.SignedString([]byte(secret))
 }
 
-func validate(tokenStr, secret string) (string, []string, error) {
+func validate(tokenStr, secret, expectedType string) (string, []string, error) {
 	t, err := jwt.ParseWithClaims(tokenStr, &claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method")
@@ -53,7 +57,7 @@ func validate(tokenStr, secret string) (string, []string, error) {
 	if !ok {
 		return "", nil, fmt.Errorf("invalid claims")
 	}
-	if c.Type != "refresh" {
+	if c.Type != expectedType {
 		return "", nil, fmt.Errorf("invalid token type")
 	}
 	if c.Subject == "" {

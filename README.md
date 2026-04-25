@@ -1,6 +1,6 @@
 # velotrax-auth-go
 
-`velotrax-auth-go` là dịch vụ xác thực của Velotrax viết bằng Go. Repo này xử lý đăng ký, đăng nhập, đăng xuất và làm mới access token qua gRPC; đồng thời có một HTTP server nhỏ cho health check.
+`velotrax-auth-go` là dịch vụ xác thực của Velotrax viết bằng Go. Repo này xử lý đăng ký, đăng nhập, đăng xuất, làm mới access token và đọc/cập nhật profile user qua gRPC; đồng thời có một HTTP server nhỏ cho health check.
 
 ## Tech stack
 
@@ -34,6 +34,8 @@ internal/gen/auth         Code sinh từ proto
 - `Register`: tạo user mới, hash mật khẩu bằng bcrypt, gán role mặc định `FREE_USER`.
 - `Login`: kiểm tra email/password, trả về `access_token`, `refresh_token`, `expires_in` và thông tin user.
 - `RefreshToken`: validate refresh token rồi phát access token mới.
+- `GetProfile`: validate access token, đọc user hiện tại theo `sub`, trả về profile.
+- `UpdateProfile`: validate access token, cập nhật `user_name` và `roles` của user hiện tại.
 - JWT hiện dùng chuẩn `sub` cho user id, có thêm `type` (`access` / `refresh`) và `roles`.
 - HTTP server hiện chỉ có `/health` trả về `{ "status": "ok" }`.
 
@@ -68,6 +70,7 @@ Lưu ý:
 | `JWT_SECRET` | `change_me_to_a_strong_secret_at_least_32_chars` | Phải dài ít nhất 32 ký tự |
 | `JWT_EXPIRY` | `15m` | TTL của access token |
 | `JWT_REFRESH_EXPIRY` | `168h` | TTL của refresh token |
+| `ALLOW_ROLE_UPDATE` | `true` | Cho phép `UpdateProfile` sửa `roles` |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 
 ## Ghi chú quan trọng
@@ -75,5 +78,6 @@ Lưu ý:
 - Khi khởi động, app sẽ connect MongoDB và tạo index cho collection `users`.
 - Index hiện có cho collection `users` là `userName` unique và `active` thường.
 - File proto nguồn là `proto/auth/auth.proto`; code sinh ra nằm trong `internal/gen/auth` và không nên sửa tay.
-- `AuthService` là service gRPC chính với 4 RPC: `Register`, `Login`, `Logout`, `RefreshToken`.
+- `AuthService` là service gRPC chính với 6 RPC: `Register`, `Login`, `Logout`, `RefreshToken`, `GetProfile`, `UpdateProfile`.
 - Token JWT đã chuẩn hóa theo `sub`, `type`, `roles` để downstream service / gateway đọc đồng nhất.
+- Nếu chạy bằng `.env` trong repo, nhớ dùng đúng tên biến mà code đọc: `GRPC_PORT`, `HTTP_PORT`, `APP_ENV`, `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRY`, `JWT_REFRESH_EXPIRY`, `ALLOW_ROLE_UPDATE`.

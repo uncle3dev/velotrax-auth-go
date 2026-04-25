@@ -15,6 +15,7 @@ type Config struct {
 	JWTSecret        string        `mapstructure:"JWT_SECRET"`
 	JWTExpiry        time.Duration `mapstructure:"JWT_EXPIRY"`
 	JWTRefreshExpiry time.Duration `mapstructure:"JWT_REFRESH_EXPIRY"`
+	AllowRoleUpdate  bool          `mapstructure:"ALLOW_ROLE_UPDATE"`
 
 	LogLevel string `mapstructure:"LOG_LEVEL"`
 
@@ -28,11 +29,12 @@ func Load() (*Config, error) {
 	v.SetDefault("APP_ENV", "development")
 	v.SetDefault("JWT_EXPIRY", 15*time.Minute)
 	v.SetDefault("JWT_REFRESH_EXPIRY", 7*24*time.Hour)
+	v.SetDefault("ALLOW_ROLE_UPDATE", true)
 	v.SetDefault("LOG_LEVEL", "info")
 	v.SetDefault("JWT_SECRET", "change_me_to_a_strong_secret_at_least_32_chars")
 
 	v.AutomaticEnv()
-	for _, key := range []string{"GRPC_PORT", "HTTP_PORT", "APP_ENV", "JWT_SECRET", "JWT_EXPIRY", "JWT_REFRESH_EXPIRY", "LOG_LEVEL", "MONGO_URI"} {
+	for _, key := range []string{"GRPC_PORT", "HTTP_PORT", "APP_ENV", "JWT_SECRET", "JWT_EXPIRY", "JWT_REFRESH_EXPIRY", "ALLOW_ROLE_UPDATE", "LOG_LEVEL", "MONGO_URI"} {
 		v.BindEnv(key)
 	}
 
